@@ -1,19 +1,2 @@
-// Top 100 news providers from Semrush at Aug 25, 2020:
-https://uol.com.br
-https://globo.com
-https://www.terra.com.br
-https://metropoles.com
-https://ig.com.br
-https://r7.com
-https://brasil247.com
-https://yahoo.com
-https://cnnbrasil.com.br
-https://estadao.com.br 
-
-// Publicly recognized news providers at Aug 25, 2020:
-https://istoe.com.br
-https://veja.abril.com.br
-https://gauchazh.clicrbs.com.br
-https://www.msn.com/pt-br
-https://diariodonordeste.verdesmares.com.br/
-https://www.correiobraziliense.com.br/
+// Brazilian Wikipedia root:
+https://br.wikipedia.org
