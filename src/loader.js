@@ -144,19 +144,22 @@ class DomainProcessor {
       // Waits at most 30 seconds - to avoid infinite hangouts:
       page.setDefaultTimeout(30000)
       page.setDefaultNavigationTimeout(30000)
-      await page.setViewport({ width: 1280, height: 15360 })
-      await page.setRequestInterception(true)
-      page.on('request', (req) => {
-        if (
-          req.resourceType() == 'stylesheet' ||
-          req.resourceType() == 'font' ||
-          req.resourceType() == 'image'
-        ) {
-          req.abort()
-        } else {
-          req.continue()
-        }
-      })
+      // Crawler prepared to load static pages - huge viewport is irrelevant, so use a standard one:
+      await page.setViewport({ width: 1280, height: 1080 })
+      // Is this request interception relevant for this crawling process? Answer: no.
+      // So these interceptions are disabled, because they're provoking downloads hang ups.
+      // await page.setRequestInterception(true)
+      // page.on('request', (req) => {
+      //   if (
+      //     req.resourceType() == 'stylesheet' ||
+      //     req.resourceType() == 'font' ||
+      //     req.resourceType() == 'image'
+      //   ) {
+      //     req.abort()
+      //   } else {
+      //     req.continue()
+      //   }
+      // })
       await page.goto(url, { waitUntil: 'load' })
 
       // TODO: implement page autoscroll here, to load more elements.
