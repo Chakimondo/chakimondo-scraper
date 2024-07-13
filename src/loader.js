@@ -156,7 +156,7 @@ class DomainProcessor {
           req.continue()
         }
       })
-      await page.goto(url, { waitUntil: 'domcontentloaded' })
+      await page.goto(url, { waitUntil: 'load' })
 
       // TODO: implement page autoscroll here, to load more elements.
       // Reference: reference: https://stackoverflow.com/questions/51529332/puppeteer-scroll-down-until-you-cant-anymore
