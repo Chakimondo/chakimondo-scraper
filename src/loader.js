@@ -21,7 +21,7 @@ class DomainProcessor {
     // The scan span increases exponentially, with high factors (higher the 100) - the
     // idea of the scraper is a broad shallow search, so deep searchs will not be encouraged
     // at this moment, unless lots of resources, in the future, are available:
-    deepestLevel = 3,
+    deepestLevel = 6,
   ) {
     this.url = url
     this.savingDirectory = savingDirectory
