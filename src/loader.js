@@ -122,7 +122,7 @@ class DomainProcessor {
         // Process link, increasing the level. New found links below the maximum level are added to hrefQueue
         await this.processPage(link.url, link.level)
         // Sleep some random time, to avoid remote server overloading.
-        const wait = (2000 + 1000 * Math.random()) | 0
+        const wait = (650 + 700 * Math.random()) | 0
         console.log('Wating between pages: ', wait)
         await sleep(wait)
       }
@@ -141,8 +141,9 @@ class DomainProcessor {
       console.log('Processing Page: ', url)
       // Process links and set level = 0 - since homepage is the first level
       const page = await this.browser.newPage()
-      // Waits at most a minute and a half - to avoid infinite hangouts:
-      await page.setDefaultNavigationTimeout(90000)
+      // Waits at most 30 seconds - to avoid infinite hangouts:
+      page.setDefaultTimeout(30000)
+      page.setDefaultNavigationTimeout(30000)
       await page.setViewport({ width: 1280, height: 15360 })
       await page.setRequestInterception(true)
       page.on('request', (req) => {
