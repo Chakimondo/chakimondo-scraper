@@ -11,8 +11,12 @@ program
 
 program.requiredOption('-u, --url <url>', 'Domain main site')
 program.option('-r, --robots [robots]', 'Use robots.txt file', 'false')
-program.option('-r, --sitemaps [sitemaps]', 'Use sitemaps to crawl', 'false')
-program.option('-s, --saving-directory <directory>', path.join(HOME, '.celebmeter', 'database'))
+program.option('-S, --sitemaps [sitemaps]', 'Use sitemaps to crawl', 'false')
+program.option('-d, --depth [depth]', 'Crawling linking search depth from website root.', '0')
+program.option(
+  '-s, --saving-directory <directory>',
+  path.join(HOME, '.kronodynamic-crawl', 'database'),
+)
 program.parse()
 
 const O = program.opts()
@@ -22,7 +26,9 @@ const processor = new DomainProcessor(
   O.url,
   O.directory,
   O.robots !== 'false',
-  O.sitemaps !== 'false'
+  O.sitemaps !== 'false',
+  0,
+  parseInt(O.depth),
 )
 // Evaluate all page content:
 processor.evaluate()

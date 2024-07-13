@@ -9,7 +9,7 @@ const { exec } = require('child_process')
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 const HOME = process.env.HOME
-const SAVING_DIRECTORY = path.join(HOME, '.celebmeter', 'database')
+const SAVING_DIRECTORY = path.join(HOME, '.kronodynamic-crawl', 'database')
 
 class DomainProcessor {
   constructor(
@@ -21,7 +21,7 @@ class DomainProcessor {
     // The scan span increases exponentially, with high factors (higher the 100) - the
     // idea of the scraper is a broad shallow search, so deep searchs will not be encouraged
     // at this moment, unless lots of resources, in the future, are available:
-    deepestLevel = 3
+    deepestLevel = 3,
   ) {
     this.url = url
     this.savingDirectory = savingDirectory
@@ -285,7 +285,7 @@ class DomainProcessor {
         level,
         this.deepestLevel,
         url,
-        moment().utc().format()
+        moment().utc().format(),
       )
       this.hrefQueue.push(...resources.links)
       await page.close()
@@ -315,7 +315,7 @@ class DomainProcessor {
         (err, smps) => {
           console.log('Processed Sitemap.')
           resolve(true)
-        }
+        },
       )
     })
   }
@@ -367,7 +367,7 @@ class DomainProcessor {
         this.url.replace(new RegExp('/', 'g'), '_SLASH_').replace(/\:/g, '_COLON_') +
           '_EOURL_' +
           moment.utc().format() +
-          '.txt'
+          '.txt',
       )
       fs.writeFileSync(fname, this.tagOutputBuffer.join('\n'))
       exec(`bzip2 --best ${fname}`)
