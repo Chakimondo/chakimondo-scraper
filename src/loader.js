@@ -147,20 +147,6 @@ class DomainProcessor {
       page.setDefaultNavigationTimeout(30000)
       // Crawler prepared to load static pages - huge viewport is irrelevant, so use a standard one:
       await page.setViewport({ width: 1280, height: 1080 })
-      // Is this request interception relevant for this crawling process? Answer: no.
-      // So these interceptions are disabled, because they're provoking downloads hang ups.
-      // await page.setRequestInterception(true)
-      // page.on('request', (req) => {
-      //   if (
-      //     req.resourceType() == 'stylesheet' ||
-      //     req.resourceType() == 'font' ||
-      //     req.resourceType() == 'image'
-      //   ) {
-      //     req.abort()
-      //   } else {
-      //     req.continue()
-      //   }
-      // })
       await page.goto(url, { waitUntil: 'load' })
 
       // TODO: implement page autoscroll here, to load more elements.
@@ -178,10 +164,7 @@ class DomainProcessor {
                 if (
                   // Download only relevant paragraph data (which belong to relevant text corpus)
                   innerText !== '' &&
-                  c.tagName.toLowerCase() === 'p' // &&
-                  // c.tagName.toLowerCase() !== 'script' &&
-                  // c.tagName.toLowerCase() !== 'style' &&
-                  // c.tagName.toLowerCase() !== 'noscript'
+                  c.tagName.toLowerCase() === 'p'
                 ) {
                   res.push({
                     tag: c.tagName,
@@ -198,74 +181,6 @@ class DomainProcessor {
             })
             return res
           }
-          // Only extract text. Ignore other tags contents:
-          // function extractMeta(node) {
-          //   // From Facebook and Twitter standards:
-          //   // from <meta name="og:*"></meta> or <meta name="twitter:*"></meta>
-          //   const metas = node.getElementsByTagName('meta')
-          //   const res = []
-          //   for (let i = 0; i < metas.length; i++) {
-          //     const meta = metas.item(i)
-          //     const metaName = meta.getAttribute('name')
-          //     const metaProperty = meta.getAttribute('property')
-          //     if (
-          //       (metaName && metaName.toLowerCase().trim().startsWith('og:')) ||
-          //       metaName?.toLowerCase()?.trim() === 'description' ||
-          //       metaName?.toLowerCase()?.trim() === 'keywords' ||
-          //       (metaProperty &&
-          //         (metaProperty.toLowerCase().trim().startsWith('og:') ||
-          //           metaProperty.toLowerCase().trim().startsWith('article:')))
-          //     ) {
-          //       res.push({
-          //         tag: meta.tagName,
-          //         name: meta.getAttribute('name')?.trim(),
-          //         content: meta.getAttribute('content')?.trim(),
-          //         text: meta.innerText?.trim(),
-          //         property: meta.getAttribute('property')?.trim(),
-          //         level: level,
-          //         source: url,
-          //         utcDate: m,
-          //       })
-          //     }
-          //   }
-          //   return res
-          // }
-          // function extractJsonLd(node) {
-          //   // From Google standard:
-          //   // from <script type="application/ld+json">...</script>
-          //   const scripts = node.getElementsByTagName('script')
-          //   const res = []
-          //   for (let i = 0; i < scripts.length; i++) {
-          //     const script = scripts.item(i)
-          //     const type = script.getAttribute('type')
-          //     if (type && type.toLowerCase().trim() === 'application/ld+json') {
-          //       res.push({
-          //         tag: script.tagName,
-          //         type: type,
-          //         text: script.innerText?.trim(),
-          //         level: level,
-          //         source: url,
-          //         utcDate: m,
-          //       })
-          //     }
-          //   }
-          //   return res
-          // }
-          // function extractTitle(head) {
-          //   const title = head.getElementsByTagName('title')
-          //   const res = []
-          //   for (let i = 0; i < title.length; i++) {
-          //     const t = title.item(i)
-          //     res.push({
-          //       tag: t.tagName,
-          //       text: t.innerText?.trim(),
-          //       level: level,
-          //       source: url,
-          //       utcDate: m,
-          //     })
-          //   }
-          //   return res
-          // }
           const res = { links: [] }
           if (level < deepestLevel) {
             const links = document.getElementsByTagName('a')
@@ -281,14 +196,7 @@ class DomainProcessor {
             }
           }
           res.text = []
-          res.jsonld = []
-          res.meta = []
-          res.title = []
           res.text.push(...extractText(document.body))
-          // Extract only text body. Ignore other data and metadata:
-          // res.jsonld = extractJsonLd(document)
-          // res.meta = extractMeta(document.head)
-          // res.title = extractTitle(document.head)
           return res
         },
         level,
@@ -298,10 +206,6 @@ class DomainProcessor {
       )
       this.hrefQueue.push(...resources.links)
       await page.close()
-      // Save only loaded text. Ignore other outputs:
-      // resources.title.forEach((r) => this.writeOutput(r))
-      // resources.meta.forEach((r) => this.writeOutput(r))
-      // resources.jsonld.forEach((r) => this.writeOutput(r))
       resources.text.forEach((r) => this.writeOutput(r))
       console.log('Processed Page.')
       console.log('This is the total of links: ', this.hrefQueue.length)
