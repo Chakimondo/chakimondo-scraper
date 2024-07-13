@@ -122,7 +122,7 @@ class DomainProcessor {
         // Process link, increasing the level. New found links below the maximum level are added to hrefQueue
         await this.processPage(link.url, link.level)
         // Sleep some random time, to avoid remote server overloading.
-        const wait = (650 + 700 * Math.random()) | 0
+        const wait = (2000 + 1000 * Math.random()) | 0
         console.log('Wating between pages: ', wait)
         await sleep(wait)
       }
