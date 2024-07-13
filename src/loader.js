@@ -21,7 +21,7 @@ class DomainProcessor {
     // The scan span increases exponentially, with high factors (higher the 100) - the
     // idea of the scraper is a broad shallow search, so deep searchs will not be encouraged
     // at this moment, unless lots of resources, in the future, are available:
-    deepestLevel = 6,
+    deepestLevel = 9,
   ) {
     this.url = url
     this.savingDirectory = savingDirectory
@@ -33,6 +33,7 @@ class DomainProcessor {
     this.deepestLevel = deepestLevel
     this.processedPages = new Set()
     this.tagOutputBuffer = []
+    this.limitBufferSize = 10000
   }
   async evaluate() {
     // Create the directory here
@@ -175,10 +176,12 @@ class DomainProcessor {
               if (c.innerText) {
                 const innerText = c.innerText.trim()
                 if (
+                  // Download only relevant paragraph data (which belong to relevant text corpus)
                   innerText !== '' &&
-                  c.tagName.toLowerCase() !== 'script' &&
-                  c.tagName.toLowerCase() !== 'style' &&
-                  c.tagName.toLowerCase() !== 'noscript'
+                  c.tagName.toLowerCase() === 'p' // &&
+                  // c.tagName.toLowerCase() !== 'script' &&
+                  // c.tagName.toLowerCase() !== 'style' &&
+                  // c.tagName.toLowerCase() !== 'noscript'
                 ) {
                   res.push({
                     tag: c.tagName,
@@ -195,73 +198,74 @@ class DomainProcessor {
             })
             return res
           }
-          function extractMeta(node) {
-            // From Facebook and Twitter standards:
-            // from <meta name="og:*"></meta> or <meta name="twitter:*"></meta>
-            const metas = node.getElementsByTagName('meta')
-            const res = []
-            for (let i = 0; i < metas.length; i++) {
-              const meta = metas.item(i)
-              const metaName = meta.getAttribute('name')
-              const metaProperty = meta.getAttribute('property')
-              if (
-                (metaName && metaName.toLowerCase().trim().startsWith('og:')) ||
-                metaName?.toLowerCase()?.trim() === 'description' ||
-                metaName?.toLowerCase()?.trim() === 'keywords' ||
-                (metaProperty &&
-                  (metaProperty.toLowerCase().trim().startsWith('og:') ||
-                    metaProperty.toLowerCase().trim().startsWith('article:')))
-              ) {
-                res.push({
-                  tag: meta.tagName,
-                  name: meta.getAttribute('name')?.trim(),
-                  content: meta.getAttribute('content')?.trim(),
-                  text: meta.innerText?.trim(),
-                  property: meta.getAttribute('property')?.trim(),
-                  level: level,
-                  source: url,
-                  utcDate: m,
-                })
-              }
-            }
-            return res
-          }
-          function extractJsonLd(node) {
-            // From Google standard:
-            // from <script type="application/ld+json">...</script>
-            const scripts = node.getElementsByTagName('script')
-            const res = []
-            for (let i = 0; i < scripts.length; i++) {
-              const script = scripts.item(i)
-              const type = script.getAttribute('type')
-              if (type && type.toLowerCase().trim() === 'application/ld+json') {
-                res.push({
-                  tag: script.tagName,
-                  type: type,
-                  text: script.innerText?.trim(),
-                  level: level,
-                  source: url,
-                  utcDate: m,
-                })
-              }
-            }
-            return res
-          }
-          function extractTitle(head) {
-            const title = head.getElementsByTagName('title')
-            const res = []
-            for (let i = 0; i < title.length; i++) {
-              const t = title.item(i)
-              res.push({
-                tag: t.tagName,
-                text: t.innerText?.trim(),
-                level: level,
-                source: url,
-                utcDate: m,
-              })
-            }
-            return res
-          }
+          // Only extract text. Ignore other tags contents:
+          // function extractMeta(node) {
+          //   // From Facebook and Twitter standards:
+          //   // from <meta name="og:*"></meta> or <meta name="twitter:*"></meta>
+          //   const metas = node.getElementsByTagName('meta')
+          //   const res = []
+          //   for (let i = 0; i < metas.length; i++) {
+          //     const meta = metas.item(i)
+          //     const metaName = meta.getAttribute('name')
+          //     const metaProperty = meta.getAttribute('property')
+          //     if (
+          //       (metaName && metaName.toLowerCase().trim().startsWith('og:')) ||
+          //       metaName?.toLowerCase()?.trim() === 'description' ||
+          //       metaName?.toLowerCase()?.trim() === 'keywords' ||
+          //       (metaProperty &&
+          //         (metaProperty.toLowerCase().trim().startsWith('og:') ||
+          //           metaProperty.toLowerCase().trim().startsWith('article:')))
+          //     ) {
+          //       res.push({
+          //         tag: meta.tagName,
+          //         name: meta.getAttribute('name')?.trim(),
+          //         content: meta.getAttribute('content')?.trim(),
+          //         text: meta.innerText?.trim(),
+          //         property: meta.getAttribute('property')?.trim(),
+          //         level: level,
+          //         source: url,
+          //         utcDate: m,
+          //       })
+          //     }
+          //   }
+          //   return res
+          // }
+          // function extractJsonLd(node) {
+          //   // From Google standard:
+          //   // from <script type="application/ld+json">...</script>
+          //   const scripts = node.getElementsByTagName('script')
+          //   const res = []
+          //   for (let i = 0; i < scripts.length; i++) {
+          //     const script = scripts.item(i)
+          //     const type = script.getAttribute('type')
+          //     if (type && type.toLowerCase().trim() === 'application/ld+json') {
+          //       res.push({
+          //         tag: script.tagName,
+          //         type: type,
+          //         text: script.innerText?.trim(),
+          //         level: level,
+          //         source: url,
+          //         utcDate: m,
+          //       })
+          //     }
+          //   }
+          //   return res
+          // }
+          // function extractTitle(head) {
+          //   const title = head.getElementsByTagName('title')
+          //   const res = []
+          //   for (let i = 0; i < title.length; i++) {
+          //     const t = title.item(i)
+          //     res.push({
+          //       tag: t.tagName,
+          //       text: t.innerText?.trim(),
+          //       level: level,
+          //       source: url,
+          //       utcDate: m,
+          //     })
+          //   }
+          //   return res
+          // }
           const res = { links: [] }
           if (level < deepestLevel) {
             const links = document.getElementsByTagName('a')
@@ -281,9 +285,10 @@ class DomainProcessor {
           res.meta = []
           res.title = []
           res.text.push(...extractText(document.body))
-          res.jsonld = extractJsonLd(document)
-          res.meta = extractMeta(document.head)
-          res.title = extractTitle(document.head)
+          // Extract only text body. Ignore other data and metadata:
+          // res.jsonld = extractJsonLd(document)
+          // res.meta = extractMeta(document.head)
+          // res.title = extractTitle(document.head)
           return res
         },
         level,
@@ -293,12 +298,19 @@ class DomainProcessor {
       )
       this.hrefQueue.push(...resources.links)
       await page.close()
-      resources.title.forEach((r) => this.writeOutput(r))
-      resources.meta.forEach((r) => this.writeOutput(r))
-      resources.jsonld.forEach((r) => this.writeOutput(r))
+      // Save only loaded text. Ignore other outputs:
+      // resources.title.forEach((r) => this.writeOutput(r))
+      // resources.meta.forEach((r) => this.writeOutput(r))
+      // resources.jsonld.forEach((r) => this.writeOutput(r))
       resources.text.forEach((r) => this.writeOutput(r))
       console.log('Processed Page.')
       console.log('This is the total of links: ', this.hrefQueue.length)
+      console.log('Current buffer size: ', this.tagOutputBuffer.length)
+      console.log(
+        'Items to download before persisting: ',
+        this.limitBufferSize - this.tagOutputBuffer.length,
+      )
+      console.log()
     } catch (exception) {
       console.log('Unable to process page: ', exception)
     }
@@ -358,7 +370,7 @@ class DomainProcessor {
 
   writeOutput(o) {
     this.tagOutputBuffer.push(JSON.stringify(o))
-    if (this.tagOutputBuffer.length >= 10000) {
+    if (this.tagOutputBuffer.length >= this.limitBufferSize) {
       // Write output to file.
       this.persistOutputBuffer()
     }
