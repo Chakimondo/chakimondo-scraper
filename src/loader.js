@@ -118,10 +118,11 @@ class DomainProcessor {
 
       // Extract link from start of the queue:
       const link = this.hrefQueue.shift()
+      let processSuccesful = false
 
       if (this.verifyLevel(link) && this.verifyDomain(link) && this.verifyVisited(link)) {
         // Process link, increasing the level. New found links below the maximum level are added to hrefQueue
-        await this.processPage(link.url, link.level)
+        processSuccesful = await this.processPage(link.url, link.level)
         // Sleep some random time, to avoid remote server overloading.
         const wait = (650 + 700 * Math.random()) | 0
         console.log('Wating between pages: ', wait)
@@ -130,7 +131,12 @@ class DomainProcessor {
       // Otherwise, just ignore the link completely - links pointing outside the domain are ignored
 
       // Set the page as already processed:
-      this.processedPages.add(link.url)
+      if (processSuccesful) {
+        this.processedPages.add(link.url)
+      } else {
+        // TODO: create criterion to re-enqueue the unprocessed link.
+        // To simply re-enqueue in case of error will make the system to run forever in case of a dead link
+      }
     }
 
     // write output file here
@@ -215,8 +221,10 @@ class DomainProcessor {
         this.limitBufferSize - this.tagOutputBuffer.length,
       )
       console.log()
+      return true
     } catch (exception) {
       console.log('Unable to process page: ', exception)
+      return false
     }
   }
 
