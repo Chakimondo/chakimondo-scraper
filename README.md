@@ -1,6 +1,14 @@
-# Celebmeter Scraper
+# Kronodynamic Scraper
 
-Scraper to load basic text from news websites.
+Scraper to load basic static text from websites. Not suitable to dynamic (with lots of Javascript dynamic content) webpages. The best example of such type of website is Wikipedia.
+
+This scraper focus on load plain text from body paragraphs, dumping only text encased by **p** html tags.
+
+## Usage:
+
+```sh
+npx node src/index.js -u 'https://pt.wikipedia.org'
+```
 
 # TODO:
 
