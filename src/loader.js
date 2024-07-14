@@ -144,19 +144,17 @@ class DomainProcessor {
   }
 
   async processPage(url, level) {
+    console.log('Processing Page: ', url)
+    // Initialize page object to process page:
+    const page = await this.browser.newPage()
+    let success = false
     try {
-      console.log('Processing Page: ', url)
-      // Process links and set level = 0 - since homepage is the first level
-      const page = await this.browser.newPage()
       // Waits at most 30 seconds - to avoid infinite hangouts:
       page.setDefaultTimeout(30000)
       page.setDefaultNavigationTimeout(30000)
       // Crawler prepared to load static pages - huge viewport is irrelevant, so use a standard one:
       await page.setViewport({ width: 1280, height: 1080 })
       await page.goto(url, { waitUntil: 'load' })
-
-      // TODO: implement page autoscroll here, to load more elements.
-      // Reference: reference: https://stackoverflow.com/questions/51529332/puppeteer-scroll-down-until-you-cant-anymore
 
       // Continue processing data resources:
       const resources = await page.evaluate(
@@ -211,7 +209,6 @@ class DomainProcessor {
         moment().utc().format(),
       )
       this.hrefQueue.push(...resources.links)
-      await page.close()
       resources.text.forEach((r) => this.writeOutput(r))
       console.log('Processed Page.')
       console.log('This is the total of links: ', this.hrefQueue.length)
@@ -221,11 +218,16 @@ class DomainProcessor {
         this.limitBufferSize - this.tagOutputBuffer.length,
       )
       console.log()
-      return true
+      success = true
     } catch (exception) {
       console.log('Unable to process page: ', exception)
-      return false
     }
+    try {
+      page.close()
+    } catch (exception) {
+      console.log('Error closing page: ', exception)
+    }
+    return success
   }
 
   processSitemap(sitemap) {
