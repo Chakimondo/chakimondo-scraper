@@ -222,11 +222,13 @@ class DomainProcessor {
     } catch (exception) {
       console.log('Unable to process page: ', exception)
     }
+
     try {
       page.close()
     } catch (exception) {
       console.log('Error closing page: ', exception)
     }
+
     return success
   }
 
