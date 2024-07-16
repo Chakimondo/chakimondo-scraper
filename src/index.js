@@ -21,6 +21,8 @@ program.parse()
 
 const O = program.opts()
 
+// To use database connection: PostgreSQL - host: localhost, user: kronodynamic, password: krono
+
 // Load file with set of websites to be scraped
 const processor = new DomainProcessor(
   O.url,
