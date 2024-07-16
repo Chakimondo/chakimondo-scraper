@@ -18,6 +18,11 @@ program.option(
   path.join(HOME, '.kronodynamic-crawl', 'database'),
 )
 program.option('-D, --drop', 'Drop current crawler from database')
+program.options('-c, --clear', 'Clear previous downloaded data from crawling, restarting it.')
+program.options(
+  '-r, --restart',
+  'Restart crawling process, but maintain previously downloaded data',
+)
 program.parse()
 
 const O = program.opts()
