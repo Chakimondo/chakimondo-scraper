@@ -17,6 +17,7 @@ program.option(
   '-s, --saving-directory <directory>',
   path.join(HOME, '.kronodynamic-crawl', 'database'),
 )
+program.option('-D, --drop', 'Drop current crawler from database')
 program.parse()
 
 const O = program.opts()
