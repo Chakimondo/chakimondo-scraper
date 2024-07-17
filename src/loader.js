@@ -27,7 +27,6 @@ class DomainProcessor {
     this.url = url
     this.savingDirectory = savingDirectory
     this.hrefQueue = []
-    this.browser = null
     this.tryRobots = tryRobots
     this.trySitemaps = trySitemaps
     this.startLevel = startLevel
@@ -46,16 +45,8 @@ class DomainProcessor {
       console.log('Unable to create savingDirectory. Going on:', e)
     }
 
-    // Initialize puppeteer, if it's not initialized:
-    if (this.browser === null) {
-      this.browser = await puppeteer.launch()
-    }
-
     // Finally, process domain:
     this.processDomain()
-
-    await this.browser.close()
-    this.browser = null
   }
 
   async processRobots() {
@@ -112,15 +103,9 @@ class DomainProcessor {
     await this.processPage(this.url, this.startLevel)
     this.processedPages.add(this.url)
 
-    console.log('Chegou nessa merda anterior')
-
     // Evaluate robots and sitemaps if necessary:
     this.processRobots()
-    console.log('Chegou nessa merda posterior')
-
     this.processSitemaps()
-
-    console.log('Chegou nessa merda')
 
     // Start to process website contents:
     while (this.hrefQueue.length > 0) {
@@ -156,8 +141,10 @@ class DomainProcessor {
   async processPage(url, level) {
     console.log('Processing Page: ', url)
     // Initialize page object to process page:
-    const page = await this.browser.newPage()
+    const browser = await puppeteer.launch()
+    const page = await browser.newPage()
     let success = false
+
     try {
       // Waits at most 30 seconds - to avoid infinite hangouts:
       page.setDefaultTimeout(30000)
@@ -234,7 +221,8 @@ class DomainProcessor {
     }
 
     try {
-      page.close()
+      await page.close()
+      await browser.close()
     } catch (exception) {
       console.log('Error closing page: ', exception)
     }
