@@ -63,7 +63,20 @@ async function run(configurations) {
     o.depth,
     knex,
   )
-  if (O.action == 'continue') {
-    processor.evaluate()
+  switch (O.action) {
+    case 'continue':
+      processor.evaluate()
+      break
+    case 'clear':
+      processor.clear()
+      processor.evaluate()
+      break
+    case 'restart':
+      processor.drop()
+      processor.evaluate()
+      break
+    case 'drop':
+      processor.drop()
+      break
   }
 }

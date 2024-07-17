@@ -36,6 +36,7 @@ class DomainProcessor {
     this.tagOutputBuffer = []
     this.limitBufferSize = 10000
     this.knex = knex
+    this.sitemaps = [`${this.url}`] // With default sitemap
   }
   async evaluate() {
     // Create the directory here
@@ -49,6 +50,15 @@ class DomainProcessor {
     if (this.browser === null) {
       this.browser = await puppeteer.launch()
     }
+
+    // Finally, process domain:
+    this.processDomain()
+
+    await this.browser.close()
+    this.browser = null
+  }
+
+  async processRobots() {
     if (this.tryRobots) {
       const robots = `${this.url}/robots.txt`
       let req = null
@@ -74,47 +84,45 @@ class DomainProcessor {
           tries++
         }
       }
-      if (req && req.status <= 299 && req.status >= 200) {
-        await this.processDomain(this.url, robots, req.data)
-      } else {
-        await this.processDomain(this.url)
-      }
-    } else {
-      await this.processDomain(this.url)
-    }
-    await this.browser.close()
-    this.browser = null
-  }
 
-  async processDomain(domain, robots, contents) {
-    console.log('Processing home page...')
-    await this.processPage(domain, this.startLevel)
-    this.processedPages.add(domain)
-    if (robots && contents) {
-      console.log('Processing robots: ', robots)
-      this.robotsParser = robotsParser(robots, contents)
-      const sitemaps = this.robotsParser.getSitemaps()
-      console.log('Process the front-page (level 0) links and crawl it')
-      if (sitemaps.length === 0) {
-        // Add default sitemap:
-        sitemaps.push(domain + '/sitemap.xml')
-      }
-      if (this.trySitemaps) {
-        console.log('Trying to process sitemaps: ', domain + '/sitemap.xml')
-        for await (const sitemap of sitemaps) {
-          await this.processSitemap(sitemap)
-          console.log('This is the total of links: ', this.hrefQueue.length)
+      if (req && req.status <= 299 && req.status >= 200) {
+        console.log('Processing robots: ', robots)
+        this.robotsParser = robotsParser(robots, req.data)
+        const sitemaps = this.robotsParser.getSitemaps()
+        // Add prospected sitemaps:
+        if (sitemaps.length !== 0) {
+          this.sitemaps = this.sitemaps.concat(sitemaps)
         }
       }
-    } else {
-      if (this.trySitemaps) {
-        // Try to process default sitemap:
-        console.log('Trying to process default sitemap: ', domain + '/sitemap.xml')
-        await this.processSitemap(domain + '/sitemap.xml')
+    }
+  }
+
+  async processSitemaps() {
+    if (this.trySitemaps) {
+      console.log('Trying to process sitemaps: ', this.url + '/sitemap.xml')
+      for await (const sitemap of this.sitemaps) {
+        await this.processSitemap(sitemap)
+        console.log('This is the total of links: ', this.hrefQueue.length)
       }
     }
+  }
 
-    // Start to process contents:
+  async processDomain() {
+    console.log('Processing home page...')
+    await this.processPage(this.url, this.startLevel)
+    this.processedPages.add(this.url)
+
+    console.log('Chegou nessa merda anterior')
+
+    // Evaluate robots and sitemaps if necessary:
+    this.processRobots()
+    console.log('Chegou nessa merda posterior')
+
+    this.processSitemaps()
+
+    console.log('Chegou nessa merda')
+
+    // Start to process website contents:
     while (this.hrefQueue.length > 0) {
       // TODO: Save processing state here, to recover in case of processing crash
 
