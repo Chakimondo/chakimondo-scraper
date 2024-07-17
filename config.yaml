@@ -1,0 +1,15 @@
+database:
+  client: pg
+  host: localhost
+  user: kronodynamic
+  password: krono
+  database: kronodynamic
+  port: 5432
+crawler:
+  root: https://pt.wikipedia.org
+  robots: false
+  sitemaps: false
+  depth: 9
+dump:
+  root: home # filesystem|home|relative
+  path: .kronodynamic/database

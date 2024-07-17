@@ -22,6 +22,7 @@ class DomainProcessor {
     // idea of the scraper is a broad shallow search, so deep searchs will not be encouraged
     // at this moment, unless lots of resources, in the future, are available:
     deepestLevel = 9,
+    knex,
   ) {
     this.url = url
     this.savingDirectory = savingDirectory
@@ -34,6 +35,7 @@ class DomainProcessor {
     this.processedPages = new Set()
     this.tagOutputBuffer = []
     this.limitBufferSize = 10000
+    this.knex = knex
   }
   async evaluate() {
     // Create the directory here

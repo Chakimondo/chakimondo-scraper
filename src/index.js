@@ -1,7 +1,7 @@
 const { program } = require('commander')
 const path = require('path')
 const { DomainProcessor } = require('./loader')
-const HOME = process.env.HOME
+const { ConfigLoader } = require('./configLoader')
 
 // Configure command line options
 program
@@ -9,37 +9,61 @@ program
   .description('Scraper to load newspaper and pages information to evaluate celebrity references.')
   .version('0.1.0')
 
-program.requiredOption(
+program.option(
   '-c, --configurations <configuration path>',
   'System configuration file path',
+  'config.yaml',
 )
-// program.requiredOption('-u, --url <url>', 'Domain main site')
-// program.option('-r, --robots [robots]', 'Use robots.txt file', 'false')
-// program.option('-S, --sitemaps [sitemaps]', 'Use sitemaps to crawl', 'false')
-// program.option('-d, --depth [depth]', 'Crawling linking search depth from website root.', '9')
-// program.option(
-//   '-s, --saving-directory <directory>',
-//   path.join(HOME, '.kronodynamic-crawl', 'database'),
-// )
-// program.option('-D, --drop', 'Drop current crawler from database')
-// program.option('-c, --clear', 'Clear previous downloaded data from crawling, restarting it.')
-// program.option('-R, --restart', 'Restart crawling process, but maintain previously downloaded data')
+program.option(
+  '-a, --action <continue|clear|restart|drop>',
+  'Action to be taken by crawler',
+  'continue',
+)
 program.parse()
 
 const O = program.opts()
 
-console.log('Config path: ', O.configurations)
+console.log('Config path: ', O)
 
-// To use database connection: PostgreSQL - host: localhost, user: kronodynamic, password: krono
+// Load configuration file:
+const config = new ConfigLoader(O.configurations)
+config
+  .load()
+  .then((res) => {
+    console.log('Configuration loaded. Starting processing')
+    run(res)
+  })
+  .catch((err) => {
+    console.error('Unable to load configuration: ', err)
+  })
 
-// Load file with set of websites to be scraped
-// const processor = new DomainProcessor(
-//   O.url,
-//   O.directory,
-//   O.robots !== 'false',
-//   O.sitemaps !== 'false',
-//   0,
-//   parseInt(O.depth),
-// )
-// // Evaluate all page content:
-// processor.evaluate()
+async function run(configurations) {
+  // Initialize database:
+  const d = configurations.database
+  const knex = require('knex')({
+    client: d.client,
+    connection: {
+      host: d.host,
+      port: d.port,
+      user: d.user,
+      password: d.password,
+      database: d.database,
+    },
+  })
+  const o = configurations.crawler
+  const u = configurations.dump
+  const processor = new DomainProcessor(
+    // Website URL:
+    o.root,
+    // Dump files directory:
+    `${u.root}/${u.path}`.replaceAll(/\/{2,}/g, '/'),
+    o.robots,
+    o.sitemaps,
+    0,
+    o.depth,
+    knex,
+  )
+  if (O.action == 'continue') {
+    processor.evaluate()
+  }
+}
