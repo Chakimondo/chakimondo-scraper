@@ -15,6 +15,7 @@ exports.up = function (knex) {
       table.bigIncrements('id')
       table.text('path').notNullable()
       table.string('status', 10).notNullable().defaultTo('fresh')
+      table.integer('level').notNullable().defaultTo(0)
       table.bigInteger('crawler_id').notNullable()
       table.foreign('crawler_id').references('crawler.id')
       table.timestamp('created_at', { useTz: true }).notNullable().defaultTo(knex.fn.now())

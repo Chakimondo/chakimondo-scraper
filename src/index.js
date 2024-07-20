@@ -23,8 +23,6 @@ program.parse()
 
 const O = program.opts()
 
-console.log('Config path: ', O)
-
 // Load configuration file:
 const config = new ConfigLoader(O.configurations)
 config
