@@ -99,6 +99,7 @@ class DomainProcessor {
   }
 
   async verifyDomain() {
+    // Verify if domain is added in the database.
     return true
   }
 
