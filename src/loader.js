@@ -98,14 +98,23 @@ class DomainProcessor {
     }
   }
 
-  async processDomain() {
+  async verifyDomain() {
+    return true
+  }
+
+  async startDomain() {
     console.log('Processing home page...')
     await this.processPage(this.url, this.startLevel)
     this.processedPages.add(this.url)
+  }
 
-    // Evaluate robots and sitemaps if necessary:
-    this.processRobots()
-    this.processSitemaps()
+  async processDomain() {
+    if (await this.verifyDomain()) {
+      await this.startDomain()
+      // Evaluate robots and sitemaps if necessary:
+      await this.processRobots()
+      await this.processSitemaps()
+    }
 
     // Start to process website contents:
     while (this.hrefQueue.length > 0) {
