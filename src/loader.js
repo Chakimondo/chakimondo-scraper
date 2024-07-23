@@ -46,10 +46,10 @@ class DomainProcessor {
     }
 
     // Finally, process domain:
-    this.processDomain()
+    await this.processDomain()
   }
 
-  async processRobots() {
+  async processRobots(trx) {
     if (this.tryRobots) {
       const robots = `${this.url}/robots.txt`
       let req = null
@@ -88,7 +88,7 @@ class DomainProcessor {
     }
   }
 
-  async processSitemaps() {
+  async processSitemaps(trx) {
     if (this.trySitemaps) {
       console.log('Trying to process sitemaps: ', this.url + '/sitemap.xml')
       for await (const sitemap of this.sitemaps) {
@@ -98,58 +98,91 @@ class DomainProcessor {
     }
   }
 
-  async verifyDomain() {
-    // Verify if domain is added in the database.
-    return true
+  async startDomain(trx) {
+    console.log('Processing home page...')
+    // Add root domain:
+    const res = await trx('crawler').insert({ root_path: this.url, status: 'idle' }, ['id'])
+    const id = res[0].id
+
+    // Add first page, the domain home page:
+    const lres = await trx('link').insert(
+      {
+        path: this.url,
+        status: 'fresh',
+        level: this.startLevel,
+        crawler_id: id,
+      },
+      ['id'],
+    )
+    const lid = lres[0].id
+    await this.processPage(lid, trx)
+    // this.processedPages.add(this.url)
   }
 
-  async startDomain() {
-    console.log('Processing home page...')
-    await this.processPage(this.url, this.startLevel)
-    this.processedPages.add(this.url)
+  async initializeDomain(trx) {
+    await this.startDomain(trx)
+    // Evaluate robots and sitemaps if necessary:
+    await this.processRobots(trx)
+    await this.processSitemaps(trx)
+  }
+
+  async continueProcessing() {
+    console.log('Trying to continue...')
+    return false
   }
 
   async processDomain() {
-    if (await this.verifyDomain()) {
-      await this.startDomain()
-      // Evaluate robots and sitemaps if necessary:
-      await this.processRobots()
-      await this.processSitemaps()
+    const trx = await this.knex.transaction()
+    try {
+      await this.initializeDomain(trx)
+      await trx.commit()
+    } catch (e) {
+      console.error(e)
+      console.log('Unable to initialize domain crawling. Trying to continue...')
+      await trx.rollback()
     }
 
-    // Start to process website contents:
-    while (this.hrefQueue.length > 0) {
-      // TODO: Save processing state here, to recover in case of processing crash
-
-      // Extract link from start of the queue:
-      const link = this.hrefQueue.shift()
-      let processSuccesful = false
-
-      if (this.verifyLevel(link) && this.verifyDomain(link) && this.verifyVisited(link)) {
-        // Process link, increasing the level. New found links below the maximum level are added to hrefQueue
-        processSuccesful = await this.processPage(link.url, link.level)
-        // Sleep some random time, to avoid remote server overloading.
-        const wait = (650 + 700 * Math.random()) | 0
-        console.log('Wating between pages: ', wait)
-        await sleep(wait)
-      }
-      // Otherwise, just ignore the link completely - links pointing outside the domain are ignored
-
-      // Set the page as already processed:
-      if (processSuccesful) {
-        this.processedPages.add(link.url)
-      } else {
-        // TODO: create criterion to re-enqueue the unprocessed link.
-        // To simply re-enqueue in case of error will make the system to run forever in case of a dead link
-      }
+    if (!(await this.continueProcessing())) {
+      return
     }
 
-    // write output file here
-    this.persistOutputBuffer()
+    // // Start to process website contents:
+    // while (this.hrefQueue.length > 0) {
+    //   // TODO: Save processing state here, to recover in case of processing crash
+
+    //   // Extract link from start of the queue:
+    //   const link = this.hrefQueue.shift()
+    //   let processSuccesful = false
+
+    //   if (this.verifyLevel(link) && this.verifyDomain(link) && this.verifyVisited(link)) {
+    //     // Process link, increasing the level. New found links below the maximum level are added to hrefQueue
+    //     processSuccesful = await this.processPage(link.url, link.level)
+    //     // Sleep some random time, to avoid remote server overloading.
+    //     const wait = (650 + 700 * Math.random()) | 0
+    //     console.log('Wating between pages: ', wait)
+    //     await sleep(wait)
+    //   }
+    //   // Otherwise, just ignore the link completely - links pointing outside the domain are ignored
+
+    //   // Set the page as already processed:
+    //   if (processSuccesful) {
+    //     this.processedPages.add(link.url)
+    //   } else {
+    //     // TODO: create criterion to re-enqueue the unprocessed link.
+    //     // To simply re-enqueue in case of error will make the system to run forever in case of a dead link
+    //   }
+    // }
+
+    // // write output file here
+    // this.persistOutputBuffer()
   }
 
-  async processPage(url, level) {
-    console.log('Processing Page: ', url)
+  async processPage(link_id, trx) {
+    // Load data from link, using link_id and trx:
+    const link_data = await trx('link').where('id', link_id).select('path', 'level', 'crawler_id')
+    const url = link_data['path']
+    const level = link_data['level']
+    console.log('Processing Page: ', link_data)
     // Initialize page object to process page:
     const browser = await puppeteer.launch()
     const page = await browser.newPage()
@@ -215,7 +248,9 @@ class DomainProcessor {
         url,
         moment().utc().format(),
       )
-      this.hrefQueue.push(...resources.links)
+      // Add new links to database here:
+      // this.hrefQueue.push(...resources.links)
+      await this.registerNewLinks(resources.links, level + 1, link_data['crawler_id'], trx)
       resources.text.forEach((r) => this.writeOutput(r))
       console.log('Processed Page.')
       console.log('This is the total of links: ', this.hrefQueue.length)
@@ -237,7 +272,32 @@ class DomainProcessor {
       console.log('Error closing page: ', exception)
     }
 
+    // Finish processing page status here:
+    if (success) {
+      await trx('link').where('id', link_id).update('status', 'processed')
+    }
+
     return success
+  }
+
+  async registerNewLinks(links, newLevel, crawler_id, trx) {
+    // 1. Register links in a set, to remove duplicated ones
+    const linkSet = new Set(links.map((l) => l.url))
+
+    // 2. For each link in the set:
+    for (let l of linkSet) {
+      // 2.1. Verify if object is in database
+      const link = await trx('link').where('path', l).select('id')
+      if (link.length == 0) {
+        // 2.2. If it's not, register it in database:
+        await trx('link').insert({
+          path: l,
+          status: 'fresh',
+          level: newLevel,
+          crawler_id: BigInt(crawler_id),
+        })
+      }
+    }
   }
 
   processSitemap(sitemap) {

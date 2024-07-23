@@ -13,7 +13,7 @@ exports.up = function (knex) {
     })
     .createTable('link', function (table) {
       table.bigIncrements('id')
-      table.text('path').notNullable()
+      table.text('path').notNullable().unique()
       table.string('status', 10).notNullable().defaultTo('fresh')
       table.integer('level').notNullable().defaultTo(0)
       table.bigInteger('crawler_id').notNullable()

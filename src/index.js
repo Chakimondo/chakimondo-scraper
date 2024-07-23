@@ -1,5 +1,5 @@
+const { exit } = require('process')
 const { program } = require('commander')
-const path = require('path')
 const { DomainProcessor } = require('./loader')
 const { ConfigLoader } = require('./configLoader')
 
@@ -27,12 +27,14 @@ const O = program.opts()
 const config = new ConfigLoader(O.configurations)
 config
   .load()
-  .then((res) => {
+  .then(async (res) => {
     console.log('Configuration loaded. Starting processing')
-    run(res)
+    await run(res)
+    exit(0)
   })
   .catch((err) => {
     console.error('Unable to load configuration: ', err)
+    exit(1)
   })
 
 async function run(configurations) {
@@ -63,18 +65,18 @@ async function run(configurations) {
   )
   switch (O.action) {
     case 'continue':
-      processor.evaluate()
+      await processor.evaluate()
       break
     case 'clear':
-      processor.clear()
-      processor.evaluate()
+      await processor.clear()
+      await processor.evaluate()
       break
     case 'restart':
-      processor.drop()
-      processor.evaluate()
+      await processor.drop()
+      await processor.evaluate()
       break
     case 'drop':
-      processor.drop()
+      await processor.drop()
       break
   }
 }
