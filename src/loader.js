@@ -130,7 +130,10 @@ class DomainProcessor {
     const res = await this.knex('crawler')
       .where('root_path', this.url)
       .andWhere('status', 'idle')
-      .update({ status: 'processing' })
+      .update({
+        status: 'processing',
+        // TODO: update updated_at field here.
+      })
 
     return res == 0
   }
