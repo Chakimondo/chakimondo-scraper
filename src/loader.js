@@ -105,18 +105,15 @@ class DomainProcessor {
     const id = res[0].id
 
     // Add first page, the domain home page:
-    const lres = await trx('link').insert(
-      {
-        path: this.url,
-        status: 'fresh',
-        level: this.startLevel,
-        crawler_id: id,
-      },
-      ['id'],
-    )
-    const lid = lres[0].id
-    await this.processPage(lid, trx)
-    // this.processedPages.add(this.url)
+    const link_data = {
+      path: this.url,
+      status: 'fresh',
+      level: this.startLevel,
+      crawler_id: id,
+    }
+    const lres = await trx('link').insert(link_data, ['id'])
+    link_data.id = lres[0].id
+    await this.processPage(link_data, trx)
   }
 
   async initializeDomain(trx) {
@@ -126,9 +123,16 @@ class DomainProcessor {
     await this.processSitemaps(trx)
   }
 
-  async continueProcessing() {
+  async abortProcessing() {
     console.log('Trying to continue...')
-    return false
+
+    // Continue processing only if crawler status is idle:
+    const res = await this.knex('crawler')
+      .where('root_path', this.url)
+      .andWhere('status', 'idle')
+      .update({ status: 'processing' })
+
+    return res == 0
   }
 
   async processDomain() {
@@ -138,13 +142,16 @@ class DomainProcessor {
       await trx.commit()
     } catch (e) {
       console.error(e)
-      console.log('Unable to initialize domain crawling. Trying to continue...')
+      console.log('Unable to initialize domain crawling.')
       await trx.rollback()
     }
 
-    if (!(await this.continueProcessing())) {
+    if (await this.abortProcessing()) {
+      console.log('An instance is running yet. Aborting.')
       return
     }
+
+    console.log('Continuing...')
 
     // // Start to process website contents:
     // while (this.hrefQueue.length > 0) {
@@ -177,11 +184,12 @@ class DomainProcessor {
     // this.persistOutputBuffer()
   }
 
-  async processPage(link_id, trx) {
+  async processPage(link_data, trx) {
     // Load data from link, using link_id and trx:
-    const link_data = await trx('link').where('id', link_id).select('path', 'level', 'crawler_id')
     const url = link_data['path']
     const level = link_data['level']
+    const link_id = link_data['id']
+
     console.log('Processing Page: ', link_data)
     // Initialize page object to process page:
     const browser = await puppeteer.launch()
