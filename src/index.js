@@ -52,17 +52,17 @@ async function run(configurations) {
   })
   const o = configurations.crawler
   const u = configurations.dump
-  const processor = new DomainProcessor(
+  const processor = new DomainProcessor({
     // Website URL:
-    o.root,
+    url: o.root,
     // Dump files directory:
-    `${u.root}/${u.path}`.replaceAll(/\/{2,}/g, '/'),
-    o.robots,
-    o.sitemaps,
-    0,
-    o.depth,
+    savingDirectory: `${u.root}/${u.path}`.replaceAll(/\/{2,}/g, '/'),
+    tryRobots: o.robots,
+    trySitemaps: o.sitemaps,
+    startLevel: 0,
+    deepestLevel: o.depth,
     knex,
-  )
+  })
   switch (O.action) {
     case 'continue':
       await processor.evaluate()

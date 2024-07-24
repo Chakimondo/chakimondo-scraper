@@ -12,7 +12,7 @@ const HOME = process.env.HOME
 const SAVING_DIRECTORY = path.join(HOME, '.kronodynamic-crawl', 'database')
 
 class DomainProcessor {
-  constructor(
+  constructor({
     url,
     savingDirectory = SAVING_DIRECTORY,
     tryRobots = false,
@@ -23,10 +23,12 @@ class DomainProcessor {
     // at this moment, unless lots of resources, in the future, are available:
     deepestLevel = 9,
     knex,
-  ) {
+  }) {
     this.url = url
     this.savingDirectory = savingDirectory
-    this.hrefQueue = []
+    // Remove hrefQueue to identify all places to dump link data to database
+    // (later, remove it completely from code):
+    // this.hrefQueue = []
     this.tryRobots = tryRobots
     this.trySitemaps = trySitemaps
     this.startLevel = startLevel
@@ -36,6 +38,7 @@ class DomainProcessor {
     this.limitBufferSize = 10000
     this.knex = knex
     this.sitemaps = [`${this.url}`] // With default sitemap
+    this.crawlerId
   }
   async evaluate() {
     // Create the directory here
@@ -49,7 +52,7 @@ class DomainProcessor {
     await this.processDomain()
   }
 
-  async processRobots(trx) {
+  async processRobots() {
     if (this.tryRobots) {
       const robots = `${this.url}/robots.txt`
       let req = null
@@ -88,11 +91,11 @@ class DomainProcessor {
     }
   }
 
-  async processSitemaps(trx) {
+  async processSitemaps(trx, skipBuffer) {
     if (this.trySitemaps) {
       console.log('Trying to process sitemaps: ', this.url + '/sitemap.xml')
       for await (const sitemap of this.sitemaps) {
-        await this.processSitemap(sitemap)
+        await this.processSitemap(sitemap, trx, skipBuffer)
         console.log('This is the total of links: ', this.hrefQueue.length)
       }
     }
@@ -102,25 +105,25 @@ class DomainProcessor {
     console.log('Processing home page...')
     // Add root domain:
     const res = await trx('crawler').insert({ root_path: this.url, status: 'idle' }, ['id'])
-    const id = res[0].id
+    this.crawlerId = res[0].id
 
     // Add first page, the domain home page:
-    const link_data = {
+    const linkData = {
       path: this.url,
       status: 'fresh',
       level: this.startLevel,
-      crawler_id: id,
+      crawler_id: this.crawlerId,
     }
-    const lres = await trx('link').insert(link_data, ['id'])
-    link_data.id = lres[0].id
-    await this.processPage(link_data, trx)
+    const lres = await trx('link').insert(linkData, ['id'])
+    linkData.id = lres[0].id
+    return await this.processPage({ linkData, trx })
   }
 
   async initializeDomain(trx) {
-    await this.startDomain(trx)
+    let { skipBuffer } = await this.startDomain(trx)
     // Evaluate robots and sitemaps if necessary:
-    await this.processRobots(trx)
-    await this.processSitemaps(trx)
+    await this.processRobots()
+    await this.processSitemaps(trx, skipBuffer)
   }
 
   async abortProcessing() {
@@ -187,17 +190,18 @@ class DomainProcessor {
     // this.persistOutputBuffer()
   }
 
-  async processPage(link_data, trx) {
+  async processPage({ linkData, trx, skipBuffer = new Set() }) {
     // Load data from link, using link_id and trx:
-    const url = link_data['path']
-    const level = link_data['level']
-    const link_id = link_data['id']
+    const url = linkData['path']
+    const level = linkData['level']
+    const linkId = linkData['id']
 
     console.log('Processing Page: ', link_data)
     // Initialize page object to process page:
     const browser = await puppeteer.launch()
     const page = await browser.newPage()
     let success = false
+    let newSkipBuffer = new Set()
 
     try {
       // Waits at most 30 seconds - to avoid infinite hangouts:
@@ -209,7 +213,7 @@ class DomainProcessor {
 
       // Continue processing data resources:
       const resources = await page.evaluate(
-        (level, deepestLevel, url, m) => {
+        (level, deepestLevel, m) => {
           function extractText(node) {
             const children = Array.from(node.children)
             const res = []
@@ -245,8 +249,6 @@ class DomainProcessor {
               res.links.push({
                 url: processedUrl.href,
                 text: link.innerText,
-                level: level + 1,
-                origin: url,
               })
             }
           }
@@ -256,12 +258,17 @@ class DomainProcessor {
         },
         level,
         this.deepestLevel,
-        url,
         moment().utc().format(),
       )
       // Add new links to database here:
       // this.hrefQueue.push(...resources.links)
-      await this.registerNewLinks(resources.links, level + 1, link_data['crawler_id'], trx)
+      newSkipBuffer = await this.registerNewLinks({
+        links: resources.links,
+        newLevel: level + 1,
+        trx,
+        skipBuffer,
+        origin: url,
+      })
       resources.text.forEach((r) => this.writeOutput(r))
       console.log('Processed Page.')
       console.log('This is the total of links: ', this.hrefQueue.length)
@@ -285,13 +292,13 @@ class DomainProcessor {
 
     // Finish processing page status here:
     if (success) {
-      await trx('link').where('id', link_id).update('status', 'processed')
+      await trx('link').where('id', linkId).update('status', 'processed')
     }
 
-    return success
+    return { success, skipBuffer: new Set([...skipBuffer, ...newSkipBuffer]) }
   }
 
-  async registerNewLinks(links, newLevel, crawler_id, trx) {
+  async registerNewLinks({ links, newLevel, trx, skipBuffer = new Set(), origin }) {
     // 1. Register links in a set, to remove duplicated ones
     const linkSet = new Set(links.map((l) => l.url))
 
@@ -299,20 +306,25 @@ class DomainProcessor {
     for (let l of linkSet) {
       // 2.1. Verify if object is in database
       const link = await trx('link').where('path', l).select('id')
-      if (link.length == 0) {
+      if (link.length == 0 && !skipBuffer.has(l)) {
         // 2.2. If it's not, register it in database:
         await trx('link').insert({
           path: l,
           status: 'fresh',
           level: newLevel,
-          crawler_id: BigInt(crawler_id),
+          crawler_id: BigInt(this.crawlerId),
+          origin,
         })
       }
     }
+
+    // Return incremented skip buffer:
+    return new Set([...skipBuffer, ...linkSet])
   }
 
-  processSitemap(sitemap) {
+  processSitemap(sitemap, trx, skipBuffer) {
     // TODO: The SiteMapStreamParser library is innefficient. Replace it by a custom one, developed internally.
+    const registerSet = new Set()
     return new Promise((resolve, reject) => {
       console.log('Sitemap: ', sitemap)
       sitemapStreamParser.parseSitemaps(
@@ -320,12 +332,21 @@ class DomainProcessor {
         (url) => {
           // Process urls and set level = 1 - sitemap pages are
           // not considered first level:
-          const l = { level: 1, url: url, origin: sitemap }
-          this.hrefQueue.push(l)
+          registerSet.add({ url: url })
+          // this.hrefQueue.push(l)
         },
         (err, smps) => {
-          console.log('Processed Sitemap.')
-          resolve(true)
+          // Dumping registers:
+          this.registerNewLinks({
+            links: registerSet,
+            newLevel: 1,
+            trx,
+            skipBuffer,
+            origin: sitemap,
+          }).then((newSkipBuffer) => {
+            console.log('Processed Sitemap.')
+            resolve({ success: true, skipBuffer: new Set([...skipBuffer, ...newSkipBuffer]) })
+          })
         },
       )
     })
