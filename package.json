@@ -12,6 +12,7 @@
     "prettier": "^3.2.5"
   },
   "dependencies": {
+    "@dataxquare/sitemap-stream-parser": "^2.2.0",
     "axios": "^1.7.2",
     "clear": "^0.1.0",
     "commander": "^12.1.0",
@@ -20,8 +21,7 @@
     "moment": "^2.30.1",
     "pg": "^8.12.0",
     "puppeteer": "^22.13.1",
-    "robots-parser": "^3.0.1",
-    "sitemap-stream-parser": "^1.7.0"
+    "robots-parser": "^3.0.1"
   },
   "engines": {
     "node": ">=18.0"

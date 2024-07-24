@@ -91,12 +91,11 @@ class DomainProcessor {
     }
   }
 
-  async processSitemaps(trx, skipBuffer) {
+  async processSitemaps(trx) {
     if (this.trySitemaps) {
       console.log('Trying to process sitemaps: ', this.url + '/sitemap.xml')
       for await (const sitemap of this.sitemaps) {
-        await this.processSitemap(sitemap, trx, skipBuffer)
-        console.log('This is the total of links: ', this.hrefQueue.length)
+        await this.processSitemap(sitemap, trx)
       }
     }
   }
@@ -107,23 +106,23 @@ class DomainProcessor {
     const res = await trx('crawler').insert({ root_path: this.url, status: 'idle' }, ['id'])
     this.crawlerId = res[0].id
 
-    // Add first page, the domain home page:
+    // Add first page, the domain home page, which will be processed later:
     const linkData = {
       path: this.url,
       status: 'fresh',
       level: this.startLevel,
       crawler_id: this.crawlerId,
+      origin: '<ROOT>',
     }
     const lres = await trx('link').insert(linkData, ['id'])
     linkData.id = lres[0].id
-    return await this.processPage({ linkData, trx })
   }
 
   async initializeDomain(trx) {
-    let { skipBuffer } = await this.startDomain(trx)
+    await this.startDomain(trx)
     // Evaluate robots and sitemaps if necessary:
     await this.processRobots()
-    await this.processSitemaps(trx, skipBuffer)
+    await this.processSitemaps(trx)
   }
 
   async abortProcessing() {
@@ -322,9 +321,8 @@ class DomainProcessor {
     return new Set([...skipBuffer, ...linkSet])
   }
 
-  processSitemap(sitemap, trx, skipBuffer) {
-    // TODO: The SiteMapStreamParser library is innefficient. Replace it by a custom one, developed internally.
-    const registerSet = new Set()
+  processSitemap(sitemap, trx) {
+    const registerSet = []
     return new Promise((resolve, reject) => {
       console.log('Sitemap: ', sitemap)
       sitemapStreamParser.parseSitemaps(
@@ -332,20 +330,20 @@ class DomainProcessor {
         (url) => {
           // Process urls and set level = 1 - sitemap pages are
           // not considered first level:
-          registerSet.add({ url: url })
+          registerSet.push({ url: url })
           // this.hrefQueue.push(l)
         },
         (err, smps) => {
+          console.log('Sitemaps: ', smps)
           // Dumping registers:
           this.registerNewLinks({
             links: registerSet,
             newLevel: 1,
             trx,
-            skipBuffer,
             origin: sitemap,
-          }).then((newSkipBuffer) => {
+          }).then(() => {
             console.log('Processed Sitemap.')
-            resolve({ success: true, skipBuffer: new Set([...skipBuffer, ...newSkipBuffer]) })
+            resolve(true)
           })
         },
       )

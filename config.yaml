@@ -6,10 +6,12 @@ database:
   database: kronodynamic
   port: 5432
 crawler:
-  root: https://pt.wikipedia.org
-  robots: false
-  sitemaps: false
-  depth: 9
+  # root: https://pt.wikipedia.org
+  root: https://www.estadao.com.br
+  robots: true
+  sitemaps: true
+  depth: 2
+  # depth: 9
 dump:
   root: home # filesystem|home|relative
   path: .kronodynamic/database
