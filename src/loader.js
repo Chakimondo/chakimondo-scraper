@@ -117,6 +117,12 @@ class DomainProcessor {
     linkData.id = lres[0].id
   }
 
+  async closeDomain() {
+    await this.knex('crawler')
+      .where('id', this.crawlerId)
+      .update({ status: 'idle', updated_at: this.knex.fn.now() })
+  }
+
   async initializeDomain(trx) {
     await this.startDomain(trx)
     // Evaluate robots and sitemaps if necessary:
@@ -131,12 +137,19 @@ class DomainProcessor {
     const res = await this.knex('crawler')
       .where('root_path', this.url)
       .andWhere('status', 'idle')
-      .update({
-        status: 'processing',
-        updated_at: this.knex.fn.now(),
-      })
+      .update(
+        {
+          status: 'processing',
+          updated_at: this.knex.fn.now(),
+        },
+        ['id'],
+      )
 
-    return res == 0
+    if (res.length != 0) {
+      this.crawlerId = res[0].id
+      return false
+    }
+    return true
   }
 
   async processDomain() {
@@ -165,8 +178,8 @@ class DomainProcessor {
         const trx = await this.knex.transaction()
         let nextStatus = 'skipped'
         // Extract link from start of the queue:
-        if (this.verifyDomain(link)) {
-          await this.processPage({ nextLink, trx })
+        if (this.verifyDomain(nextLink.path)) {
+          await this.processPage({ linkData: nextLink, trx })
           nextStatus = 'processed'
         }
         await this.finishProcessingLink({ link: nextLink, status: nextStatus, trx })
@@ -181,8 +194,11 @@ class DomainProcessor {
       goNext = this.hasNextLinkToProcess()
     }
 
-    // // write output file here
-    // this.persistOutputBuffer()
+    // Write output file here:
+    this.persistOutputBuffer()
+
+    // Finally, close the domain, so the crawler can restart again:
+    await this.closeDomain()
   }
 
   async finishProcessingLink({ link, status, trx }) {
@@ -191,17 +207,19 @@ class DomainProcessor {
 
   async getNextLinkToProcess() {
     const linkToUpdate = await this.knex('link')
+      .select('*')
       .where('status', 'fresh')
       .andWhere('crawler_id', BigInt(this.crawlerId))
       .orderBy('id', 'asc')
       .limit(1)
 
-    const updated = this.knex('link')
-      .where('id', linkToUpdate.id)
+    const updated = await this.knex('link')
+      .where('id', linkToUpdate[0].id)
       .update({ status: 'processing', updated_at: this.knex.fn.now() })
+
     if (updated > 0) {
-      linkToUpdate.status = 'processing'
-      return linkToUpdate
+      linkToUpdate[0].status = 'processing'
+      return linkToUpdate[0]
     }
 
     return false
@@ -222,7 +240,7 @@ class DomainProcessor {
     const level = linkData['level']
     const linkId = linkData['id']
 
-    console.log('Processing Page: ', link_data)
+    console.log('Processing Page: ', linkData.path)
     // Initialize page object to process page:
     const browser = await puppeteer.launch()
     const page = await browser.newPage()
@@ -239,7 +257,7 @@ class DomainProcessor {
 
       // Continue processing data resources:
       const resources = await page.evaluate(
-        (level, deepestLevel, m) => {
+        (level, deepestLevel, url, m) => {
           function extractText(node) {
             const children = Array.from(node.children)
             const res = []
@@ -284,6 +302,7 @@ class DomainProcessor {
         },
         level,
         this.deepestLevel,
+        url,
         moment().utc().format(),
       )
       // Add new links to database here:
@@ -297,7 +316,6 @@ class DomainProcessor {
       })
       resources.text.forEach((r) => this.writeOutput(r))
       console.log('Processed Page.')
-      console.log('This is the total of links: ', this.hrefQueue.length)
       console.log('Current buffer size: ', this.tagOutputBuffer.length)
       console.log(
         'Items to download before persisting: ',
@@ -377,10 +395,13 @@ class DomainProcessor {
     // or from a subdomain
     try {
       const localUrl = new URL(this.url)
-      const linkUrl = new URL(link.url)
+      const linkUrl = new URL(link)
 
       console.log('Verifying link domain: ', linkUrl.host, 'Versus local domain: ', localUrl.host)
-      const base = linkUrl.host.substr(linkUrl.host.length - localUrl.host.length)
+      const base = linkUrl.host.substring(
+        linkUrl.host.length - localUrl.host.length,
+        linkUrl.host.length,
+      )
       const isSubdomain = base === localUrl.host
       console.log(linkUrl.host, 'is subdomain of', localUrl.host, ': ', isSubdomain)
       return isSubdomain

@@ -7,8 +7,8 @@ database:
   port: 5432
 crawler:
   root: https://pt.wikipedia.org
-  robots: true
-  sitemaps: true
+  robots: false
+  sitemaps: false
   # Depth set to two only for debug (to permit links to finish and then close the crawler)
   depth: 1
   # depth: 9
