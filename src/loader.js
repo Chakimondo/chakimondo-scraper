@@ -166,12 +166,10 @@ class DomainProcessor {
         let nextStatus = 'skipped'
         // Extract link from start of the queue:
         if (this.verifyDomain(link)) {
-          await this.processPage({
-            /* Put processing data here */
-          })
+          await this.processPage({ nextLink, trx })
           nextStatus = 'processed'
         }
-        await this.finishProcessingLink(nextLink, nextStatus)
+        await this.finishProcessingLink({ link: nextLink, status: nextStatus, trx })
         await trx.commit()
       }
 
@@ -185,6 +183,37 @@ class DomainProcessor {
 
     // // write output file here
     // this.persistOutputBuffer()
+  }
+
+  async finishProcessingLink({ link, status, trx }) {
+    await trx('link').where('id', link.id).update('status', status)
+  }
+
+  async getNextLinkToProcess() {
+    const linkToUpdate = await this.knex('link')
+      .where('status', 'fresh')
+      .andWhere('crawler_id', BigInt(this.crawlerId))
+      .orderBy('id', 'asc')
+      .limit(1)
+
+    const updated = this.knex('link')
+      .where('id', linkToUpdate.id)
+      .update({ status: 'processing', updated_at: this.knex.fn.now() })
+    if (updated > 0) {
+      linkToUpdate.status = 'processing'
+      return linkToUpdate
+    }
+
+    return false
+  }
+
+  async hasNextLinkToProcess() {
+    const count = await this.knex('link')
+      .where('status', 'fresh')
+      .andWhere('crawler_id', BigInt(this.crawlerId))
+      .count('id')
+
+    return count > 0
   }
 
   async processPage({ linkData, trx, skipBuffer = new Set() }) {
@@ -238,7 +267,7 @@ class DomainProcessor {
             return res
           }
           const res = { links: [] }
-          if (level <= deepestLevel) {
+          if (level < deepestLevel) {
             const links = document.getElementsByTagName('a')
             for (let i = 0; i < links.length; i++) {
               const link = links.item(i)
