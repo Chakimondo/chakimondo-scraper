@@ -7,7 +7,7 @@ database:
   port: 5432
 crawler:
   # root: https://pt.wikipedia.org
-  root: https://www.estadao.com.br
+  root: https://wp.seantburke.com
   robots: true
   sitemaps: true
   depth: 2

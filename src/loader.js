@@ -1,7 +1,7 @@
 const axios = require('axios')
 const robotsParser = require('robots-parser')
-const sitemapStreamParser = require('sitemap-stream-parser')
 const puppeteer = require('puppeteer')
+const Sitemapper = require('sitemapper')
 const moment = require('moment')
 const fs = require('fs')
 const path = require('path')
@@ -321,33 +321,28 @@ class DomainProcessor {
     return new Set([...skipBuffer, ...linkSet])
   }
 
-  processSitemap(sitemap, trx) {
+  async processSitemap(sitemap, trx) {
     const registerSet = []
-    return new Promise((resolve, reject) => {
-      console.log('Sitemap: ', sitemap)
-      sitemapStreamParser.parseSitemaps(
-        sitemap,
-        (url) => {
-          // Process urls and set level = 1 - sitemap pages are
-          // not considered first level:
-          registerSet.push({ url: url })
-          // this.hrefQueue.push(l)
-        },
-        (err, smps) => {
-          console.log('Sitemaps: ', smps)
-          // Dumping registers:
-          this.registerNewLinks({
-            links: registerSet,
-            newLevel: 1,
-            trx,
-            origin: sitemap,
-          }).then(() => {
-            console.log('Processed Sitemap.')
-            resolve(true)
-          })
-        },
-      )
-    })
+    console.log('Sitemap: ', sitemap)
+    const sitemapper = new Sitemapper()
+    try {
+      const { sites } = await sitemapper.fetch(sitemap)
+      for (let s of sites) {
+        registerSet.push({ url: s })
+      }
+    } catch (e) {
+      console.log('Error processing sitemap: ', sitemap)
+      console.log('Skipping.')
+    }
+
+    if (registerSet.length > 0) {
+      await this.registerNewLinks({
+        links: registerSet,
+        newLevel: 1,
+        trx,
+        origin: sitemap,
+      })
+    }
   }
 
   verifyDomain(link) {
