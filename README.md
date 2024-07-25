@@ -18,9 +18,12 @@ npm install -g yarn
 
 # Install dependencies.
 yarn
+
+# Prepare database:
+npx knex migrate:latest
 ```
 
-This project is pure Javascript without no dependencies from other platforms. But it depends on [Puppeteer](https://pptr.dev/), to load dynamic websites correctly. Verify if your platform supports Puppeteer properly.
+This project is pure Javascript without no dependencies from other platforms. But it depends on [Puppeteer](https://pptr.dev/), to load dynamic websites correctly. Verify if your platform supports Puppeteer properly. Another dependency is the presence of `bzip2` program on **PATH**.
 
 ## Usage:
 
@@ -29,6 +32,8 @@ After proper installation:
 ```sh
 npx node src/index.js -u 'https://pt.wikipedia.org'
 ```
+
+Dump will be saved, compressed, in the directory `$HOME/.kronodynamic/database`
 
 # TODO:
 
