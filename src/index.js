@@ -55,7 +55,7 @@ async function run(configurations) {
     url: o.root,
     // Dump files directory:
     savingDirectory:
-      `${u.root == 'home/' ? `${HOME}/` : u.root == 'filesystem' ? '/' : ''}${u.path}`.replaceAll(
+      `${u.root == 'home' ? `${HOME}/` : u.root == 'filesystem' ? '/' : ''}${u.path}`.replaceAll(
         /\/{2,}/g,
         '/',
       ),
