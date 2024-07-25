@@ -3,6 +3,8 @@ const { program } = require('commander')
 const { DomainProcessor } = require('./loader')
 const { ConfigLoader } = require('./configLoader')
 
+const HOME = process.env.HOME
+
 // Configure command line options
 program
   .name('Celebmeter Scraper')
@@ -52,7 +54,11 @@ async function run(configurations) {
     // Website URL:
     url: o.root,
     // Dump files directory:
-    savingDirectory: `${u.root}/${u.path}`.replaceAll(/\/{2,}/g, '/'),
+    savingDirectory:
+      `${u.root == 'home/' ? `${HOME}/` : u.root == 'filesystem' ? '/' : ''}${u.path}`.replaceAll(
+        /\/{2,}/g,
+        '/',
+      ),
     tryRobots: o.robots,
     trySitemaps: o.sitemaps,
     startLevel: 0,

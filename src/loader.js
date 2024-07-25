@@ -52,35 +52,35 @@ class DomainProcessor {
   }
 
   async processRobots() {
-    if (this.tryRobots) {
-      const robots = `${this.url}/robots.txt`
-      let req = null
-      let tries = 0
+    const robots = `${this.url}/robots.txt`
+    let req = null
+    let tries = 0
 
-      while (tries < 3) {
-        try {
-          req = await axios({
-            url: robots,
-            headers: {
-              'User-Agent':
-                'Mozilla/5.0 (X11; Linux x86_64; rv:103.0) Gecko/20100101 Firefox/103.0',
-            },
-          })
-          tries = 3
-        } catch (exception) {
-          console.log('Unable to process robots.txt')
-          console.log('Error: ', exception)
-          req = null
-          console.log('Failed to load Robots.txt. Waiting 20 seconds and trying again.')
-          // Sleep twenty seconds:
-          await sleep(20000)
-          tries++
-        }
+    while (tries < 3) {
+      try {
+        req = await axios({
+          url: robots,
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64; rv:103.0) Gecko/20100101 Firefox/103.0',
+          },
+        })
+        tries = 3
+      } catch (exception) {
+        console.log('Unable to process robots.txt')
+        console.log('Error: ', exception)
+        req = null
+        console.log('Failed to load Robots.txt. Waiting 20 seconds and trying again.')
+        // Sleep twenty seconds:
+        await sleep(20000)
+        tries++
       }
+    }
 
-      if (req && req.status <= 299 && req.status >= 200) {
-        console.log('Processing robots: ', robots)
-        this.robotsParser = robotsParser(robots, req.data)
+    if (req && req.status <= 299 && req.status >= 200) {
+      console.log('Evaluating robots.txt: ', robots)
+      this.robotsParser = robotsParser(robots, req.data)
+      if (this.tryRobots) {
+        console.log('Processing robots.txt')
         const sitemaps = this.robotsParser.getSitemaps()
         // Add prospected sitemaps:
         if (sitemaps.length !== 0) {
@@ -161,6 +161,9 @@ class DomainProcessor {
       console.error(e)
       console.log('Unable to initialize domain crawling. Maybe already initialized.')
       await trx.rollback()
+
+      // Process robots to evaluate if pages can be processed properly:
+      await this.processRobots()
     }
 
     if (await this.abortProcessing()) {
@@ -179,19 +182,24 @@ class DomainProcessor {
         let nextStatus = 'skipped'
         // Extract link from start of the queue:
         if (this.verifyDomain(nextLink.path) && this.robotsParser.isAllowed(nextLink.path)) {
-          await this.processPage({ linkData: nextLink, trx })
-          nextStatus = 'processed'
+          const { success } = await this.processPage({ linkData: nextLink, trx })
+          if (success) {
+            nextStatus = 'processed'
+          } else {
+            nextStatus = 'failed'
+          }
         }
         await this.finishProcessingLink({ link: nextLink, status: nextStatus, trx })
         await trx.commit()
+        // Sleep some random time, to avoid remote server overloading.
+        if (nextStatus != 'skipped') {
+          const wait = (1000 + 750 * Math.random()) | 0
+          console.log('Wating between pages: ', wait)
+          await sleep(wait)
+        }
       }
 
-      // Sleep some random time, to avoid remote server overloading.
-      const wait = (1000 + 750 * Math.random()) | 0
-      console.log('Wating between pages: ', wait)
-      await sleep(wait)
-
-      goNext = this.hasNextLinkToProcess()
+      goNext = await this.hasNextLinkToProcess()
     }
 
     // Write output file here:
@@ -227,12 +235,12 @@ class DomainProcessor {
   }
 
   async hasNextLinkToProcess() {
-    const count = await this.knex('link')
+    const res = await this.knex('link')
       .where('status', 'fresh')
       .andWhere('crawler_id', BigInt(this.crawlerId))
       .count('id')
 
-    return count > 0
+    return res[0].count > 0
   }
 
   async processPage({ linkData, trx, skipBuffer = new Set() }) {
@@ -333,11 +341,6 @@ class DomainProcessor {
       await browser.close()
     } catch (exception) {
       console.log('Error closing page: ', exception)
-    }
-
-    // Finish processing page status here:
-    if (success) {
-      await trx('link').where('id', linkId).update('status', 'processed')
     }
 
     return { success, skipBuffer: new Set([...skipBuffer, ...newSkipBuffer]) }
