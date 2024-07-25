@@ -33,7 +33,6 @@ class DomainProcessor {
     this.trySitemaps = trySitemaps
     this.startLevel = startLevel
     this.deepestLevel = deepestLevel
-    this.processedPages = new Set()
     this.tagOutputBuffer = []
     this.limitBufferSize = 10000
     this.knex = knex
@@ -134,7 +133,7 @@ class DomainProcessor {
       .andWhere('status', 'idle')
       .update({
         status: 'processing',
-        // TODO: update updated_at field here.
+        updated_at: this.knex.fn.now(),
       })
 
     return res == 0
@@ -158,32 +157,31 @@ class DomainProcessor {
 
     console.log('Idle instance detected. Continuing...')
 
-    // // Start to process website contents:
-    // while (this.hrefQueue.length > 0) {
-    //   // TODO: Save processing state here, to recover in case of processing crash
+    // Start to process website contents:
+    let goNext = true
+    while (goNext) {
+      const nextLink = await this.getNextLinkToProcess()
+      if (nextLink) {
+        const trx = await this.knex.transaction()
+        let nextStatus = 'skipped'
+        // Extract link from start of the queue:
+        if (this.verifyDomain(link)) {
+          await this.processPage({
+            /* Put processing data here */
+          })
+          nextStatus = 'processed'
+        }
+        await this.finishProcessingLink(nextLink, nextStatus)
+        await trx.commit()
+      }
 
-    //   // Extract link from start of the queue:
-    //   const link = this.hrefQueue.shift()
-    //   let processSuccesful = false
+      // Sleep some random time, to avoid remote server overloading.
+      const wait = (650 + 700 * Math.random()) | 0
+      console.log('Wating between pages: ', wait)
+      await sleep(wait)
 
-    //   if (this.verifyLevel(link) && this.verifyDomain(link) && this.verifyVisited(link)) {
-    //     // Process link, increasing the level. New found links below the maximum level are added to hrefQueue
-    //     processSuccesful = await this.processPage(link.url, link.level)
-    //     // Sleep some random time, to avoid remote server overloading.
-    //     const wait = (650 + 700 * Math.random()) | 0
-    //     console.log('Wating between pages: ', wait)
-    //     await sleep(wait)
-    //   }
-    //   // Otherwise, just ignore the link completely - links pointing outside the domain are ignored
-
-    //   // Set the page as already processed:
-    //   if (processSuccesful) {
-    //     this.processedPages.add(link.url)
-    //   } else {
-    //     // TODO: create criterion to re-enqueue the unprocessed link.
-    //     // To simply re-enqueue in case of error will make the system to run forever in case of a dead link
-    //   }
-    // }
+      goNext = this.hasNextLinkToProcess()
+    }
 
     // // write output file here
     // this.persistOutputBuffer()
@@ -240,7 +238,7 @@ class DomainProcessor {
             return res
           }
           const res = { links: [] }
-          if (level < deepestLevel) {
+          if (level <= deepestLevel) {
             const links = document.getElementsByTagName('a')
             for (let i = 0; i < links.length; i++) {
               const link = links.item(i)
@@ -361,20 +359,6 @@ class DomainProcessor {
       console.log('Problematic link: ', link)
       return false
     }
-  }
-
-  verifyVisited(link) {
-    // Verify if the given link has already been visited.
-    // If yes, return false (don't process the link again)
-    const res = !this.processedPages.has(link.url)
-    console.log('Verifying if link', link.url, 'is not visited:', res)
-    return res
-  }
-
-  verifyLevel(link) {
-    const ignore = link.level <= this.deepestLevel
-    console.log('Verifying link', link.url, 'level: ', link.level, 'Proceed: ', ignore)
-    return ignore
   }
 
   writeOutput(o) {
