@@ -14,11 +14,7 @@ program.option(
   'System configuration file path',
   'config.yaml',
 )
-program.option(
-  '-a, --action <continue|clear|restart|drop>',
-  'Action to be taken by crawler',
-  'continue',
-)
+program.option('-a, --action <continue|clear|restart>', 'Action to be taken by crawler', 'continue')
 program.parse()
 
 const O = program.opts()
@@ -72,11 +68,8 @@ async function run(configurations) {
       await processor.evaluate()
       break
     case 'restart':
-      await processor.drop()
+      await processor.clear()
       await processor.evaluate()
-      break
-    case 'drop':
-      await processor.drop()
       break
   }
 }

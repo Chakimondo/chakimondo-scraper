@@ -147,7 +147,7 @@ class DomainProcessor {
       await trx.commit()
     } catch (e) {
       console.error(e)
-      console.log('Unable to initialize domain crawling.')
+      console.log('Unable to initialize domain crawling. Maybe already initialized.')
       await trx.rollback()
     }
 
@@ -156,7 +156,7 @@ class DomainProcessor {
       return
     }
 
-    console.log('Continuing...')
+    console.log('Idle instance detected. Continuing...')
 
     // // Start to process website contents:
     // while (this.hrefQueue.length > 0) {
