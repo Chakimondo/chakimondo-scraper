@@ -178,7 +178,7 @@ class DomainProcessor {
         const trx = await this.knex.transaction()
         let nextStatus = 'skipped'
         // Extract link from start of the queue:
-        if (this.verifyDomain(nextLink.path)) {
+        if (this.verifyDomain(nextLink.path) && this.robotsParser.isAllowed(nextLink.path)) {
           await this.processPage({ linkData: nextLink, trx })
           nextStatus = 'processed'
         }
@@ -187,7 +187,7 @@ class DomainProcessor {
       }
 
       // Sleep some random time, to avoid remote server overloading.
-      const wait = (650 + 700 * Math.random()) | 0
+      const wait = (1000 + 750 * Math.random()) | 0
       console.log('Wating between pages: ', wait)
       await sleep(wait)
 
@@ -213,15 +213,16 @@ class DomainProcessor {
       .orderBy('id', 'asc')
       .limit(1)
 
-    const updated = await this.knex('link')
-      .where('id', linkToUpdate[0].id)
-      .update({ status: 'processing', updated_at: this.knex.fn.now() })
+    if (linkToUpdate.length > 0) {
+      const updated = await this.knex('link')
+        .where('id', linkToUpdate[0].id)
+        .update({ status: 'processing', updated_at: this.knex.fn.now() })
 
-    if (updated > 0) {
-      linkToUpdate[0].status = 'processing'
-      return linkToUpdate[0]
+      if (updated > 0) {
+        linkToUpdate[0].status = 'processing'
+        return linkToUpdate[0]
+      }
     }
-
     return false
   }
 
