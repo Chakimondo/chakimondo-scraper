@@ -1,6 +1,6 @@
 # Kronodynamic Scraper
 
-Scraper to load basic static and dynamic text from websites.
+Web crawler to download training data to Kronodynamic Semantical Analysis system, a scraper to load basic static and dynamic text from websites.
 
 Currently, this scraper focus on load plain text from body paragraphs, dumping only text encased by **p** html tags.
 
