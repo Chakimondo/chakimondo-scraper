@@ -193,7 +193,7 @@ class DomainProcessor {
         await trx.commit()
         // Sleep some random time, to avoid remote server overloading.
         if (nextStatus != 'skipped') {
-          const wait = (1000 + 750 * Math.random()) | 0
+          const wait = (550 + 650 * Math.random()) | 0
           console.log('Wating between pages: ', wait)
           await sleep(wait)
         }
